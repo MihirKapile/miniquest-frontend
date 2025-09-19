@@ -11,7 +11,7 @@ if (SpeechRecognition) {
     recognition.interimResults = false;
 }
 
-const ParentDashboard = ({ questId, onBackToGame }) => {
+const ParentDashboard = ({ questId, onBackToGame ,logEvent}) => {
     const [data, setData] = useState(null);
     const [recap, setRecap] = useState("");
     const [isLoading, setIsLoading] = useState(true);
@@ -192,7 +192,7 @@ export default function App() {
     }
 
     if (view === 'dashboard') {
-        return <ParentDashboard questId={questId} onBackToGame={() => setView('game')} />;
+        return <ParentDashboard questId={questId} onBackToGame={() => setView('game')} logEvent={logEvent} />;
     }
 
     return (
