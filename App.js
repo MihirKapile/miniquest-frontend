@@ -11,89 +11,18 @@ if (SpeechRecognition) {
     recognition.interimResults = false;
 }
 
-const ParentDashboard = ({ questId, onBackToGame }) => {
-    const [data, setData] = useState(null);
-    const [recap, setRecap] = useState("");
-    const [isLoading, setIsLoading] = useState(true);
-    const [recapLoading, setRecapLoading] = useState(false);
+export default function App() {
+    // -------------------- COPPA Consent --------------------
+    const [consentGiven, setConsentGiven] = useState(false);
+    const [childId, setChildId] = useState(null);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            if (!questId) return;
-            try {
-                setIsLoading(true);
-                const res = await fetch(`${backendURL}/dashboard/${questId}`);
-                if (!res.ok) throw new Error("Failed to fetch dashboard data");
-                const dashData = await res.json();
-                setData(dashData);
-            } catch (error) {
-                console.error(error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchData();
-    }, [questId]);
-
-    const handleGenerateRecap = async () => {
-        try {
-            setRecapLoading(true);
-            setRecap("");
-            const res = await fetch(`${backendURL}/recap/${questId}`, { method: 'POST' });
-            if (!res.ok) throw new Error("Failed to generate recap");
-            const recapData = await res.json();
-            setRecap(recapData.recap);
-        } catch (error) {
-            console.error(error);
-            setRecap("Sorry, we couldn't create a story recap right now.");
-        } finally {
-            setRecapLoading(false);
-        }
+    const handleConsent = () => {
+        const anonId = `player_${Math.floor(Math.random() * 10000)}`;
+        setChildId(anonId);
+        setConsentGiven(true);
     };
 
-    if (isLoading) {
-        return <div style={styles.container}><p>Loading Dashboard...</p></div>;
-    }
-
-    return (
-        <div style={styles.container}>
-            <h1 style={styles.title}>Parent Dashboard</h1>
-            <div style={styles.dashGrid}>
-                <div style={styles.dashCard}>
-                    <h2>Time on Task</h2>
-                    <p>{data?.time_on_task || 'N/A'}</p>
-                </div>
-                <div style={styles.dashCard}>
-                    <h2>Skills Practiced</h2>
-                    <div style={styles.tagContainer}>
-                        {data?.skills_tagged?.length > 0 ? data.skills_tagged.map(skill => (
-                            <span key={skill} style={styles.tag}>{skill}</span>
-                        )) : <p>None yet</p>}
-                    </div>
-                </div>
-                <div style={{...styles.dashCard, ...styles.fullWidthCard}}>
-                    <h2>Choices Made</h2>
-                    <ul>
-                        {data?.choices_made?.length > 0 ? data.choices_made.map((choice, i) => (
-                           <li key={i}>{choice.choice}</li>
-                        )) : <p>No major choices made yet.</p>}
-                    </ul>
-                </div>
-                 <div style={{...styles.dashCard, ...styles.fullWidthCard}}>
-                    <h2>Story Recap</h2>
-                    <button onClick={handleGenerateRecap} disabled={recapLoading} style={styles.button}>
-                        {recapLoading ? 'Creating Story...' : 'Export 3-Sentence Recap'}
-                    </button>
-                    {recap && <p style={styles.recapText}>{recap}</p>}
-                </div>
-            </div>
-            <button onClick={onBackToGame} style={{...styles.button, backgroundColor: '#6c757d'}}>Back to Game</button>
-        </div>
-    );
-};
-
-
-export default function App() {
+    // -------------------- Game State --------------------
     const [view, setView] = useState('game');
     const [isRecording, setIsRecording] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -102,13 +31,15 @@ export default function App() {
     const [currentAIResponse, setCurrentAIResponse] = useState("Loading your quest...");
     const [error, setError] = useState("");
 
-    const user = "player1";
-
     useEffect(() => {
+        if (!consentGiven) return;
+
         const startNewQuest = async () => {
             try {
                 const res = await fetch(`${backendURL}/start`, {
-                    method: "POST", headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user }),
+                    method: "POST",
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user: childId }),
                 });
                 if (!res.ok) throw new Error(`Server responded with ${res.status}`);
                 const data = await res.json();
@@ -122,13 +53,14 @@ export default function App() {
                 setIsLoading(false);
             }
         };
+
         if (!SpeechRecognition) {
             setError("Sorry, your browser doesn't support speech recognition. Please try Chrome.");
             setIsLoading(false);
         } else {
             startNewQuest();
         }
-    }, []);
+    }, [consentGiven]);
 
     useEffect(() => {
         if (!recognition) return;
@@ -148,7 +80,8 @@ export default function App() {
         setIsLoading(true); setError("");
         try {
             const res = await fetch(`${backendURL}/turn`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ quest_id: questId, child_input: transcript })
             });
             if (!res.ok) throw new Error(`Server error: ${res.status}`);
@@ -169,10 +102,110 @@ export default function App() {
         else { recognition.start(); setIsRecording(true); setError(""); }
     };
 
+    // -------------------- Parent Dashboard --------------------
+    const ParentDashboard = ({ questId, onBackToGame }) => {
+        const [data, setData] = useState(null);
+        const [recap, setRecap] = useState("");
+        const [isLoadingDash, setIsLoadingDash] = useState(true);
+        const [recapLoading, setRecapLoading] = useState(false);
+
+        useEffect(() => {
+            const fetchData = async () => {
+                if (!questId) return;
+                try {
+                    setIsLoadingDash(true);
+                    const res = await fetch(`${backendURL}/dashboard/${questId}`);
+                    if (!res.ok) throw new Error("Failed to fetch dashboard data");
+                    const dashData = await res.json();
+                    setData(dashData);
+                } catch (error) {
+                    console.error(error);
+                } finally {
+                    setIsLoadingDash(false);
+                }
+            };
+            fetchData();
+        }, [questId]);
+
+        const handleGenerateRecap = async () => {
+            try {
+                setRecapLoading(true);
+                setRecap("");
+                const res = await fetch(`${backendURL}/recap/${questId}`, { method: 'POST' });
+                if (!res.ok) throw new Error("Failed to generate recap");
+                const recapData = await res.json();
+                setRecap(recapData.recap);
+            } catch (error) {
+                console.error(error);
+                setRecap("Sorry, we couldn't create a story recap right now.");
+            } finally {
+                setRecapLoading(false);
+            }
+        };
+
+        if (isLoadingDash) {
+            return <div style={styles.container}><p>Loading Dashboard...</p></div>;
+        }
+
+        return (
+            <div style={styles.container}>
+                <h1 style={styles.title}>Parent Dashboard</h1>
+                <div style={styles.dashGrid}>
+                    <div style={styles.dashCard}>
+                        <h2>Time on Task</h2>
+                        <p>{data?.time_on_task || 'N/A'}</p>
+                    </div>
+                    <div style={styles.dashCard}>
+                        <h2>Skills Practiced</h2>
+                        <div style={styles.tagContainer}>
+                            {data?.skills_tagged?.length > 0 ? data.skills_tagged.map(skill => (
+                                <span key={skill} style={styles.tag}>{skill}</span>
+                            )) : <p>None yet</p>}
+                        </div>
+                    </div>
+                    <div style={{...styles.dashCard, ...styles.fullWidthCard}}>
+                        <h2>Choices Made</h2>
+                        <ul>
+                            {data?.choices_made?.length > 0 ? data.choices_made.map((choice, i) => (
+                                <li key={i}>{choice.choice}</li>
+                            )) : <p>No major choices made yet.</p>}
+                        </ul>
+                    </div>
+                    <div style={{...styles.dashCard, ...styles.fullWidthCard}}>
+                        <h2>Story Recap</h2>
+                        <button onClick={handleGenerateRecap} disabled={recapLoading} style={styles.button}>
+                            {recapLoading ? 'Creating Story...' : 'Export 3-Sentence Recap'}
+                        </button>
+                        {recap && <p style={styles.recapText}>{recap}</p>}
+                    </div>
+                </div>
+                <button onClick={onBackToGame} style={{...styles.button, backgroundColor: '#6c757d'}}>Back to Game</button>
+            </div>
+        );
+    };
+
+    // -------------------- COPPA Consent Screen --------------------
+    if (!consentGiven) {
+        return (
+            <div style={styles.consentContainer}>
+                <h2>Parent Consent Required</h2>
+                <p>
+                    Before your child can play MiniQuest, a parent/guardian must provide consent.
+                    No personal information will be collected.
+                </p>
+                <button onClick={handleConsent} style={styles.consentButton}>
+                    I Consent
+                </button>
+            </div>
+        );
+    }
+
+    // -------------------- Parent Dashboard View --------------------
     if (view === 'dashboard') {
         return <ParentDashboard questId={questId} onBackToGame={() => setView('game')} />;
     }
 
+    // -------------------- Main Game View --------------------
     return (
         <div style={styles.container}>
             <h1 style={styles.title}>MiniQuest Adventure</h1>
@@ -195,6 +228,7 @@ export default function App() {
         </div>
     );
 }
+
 
 const styles = {
     container: { fontFamily: 'Arial, sans-serif', maxWidth: '600px', margin: 'auto', padding: '20px', textAlign: 'center', backgroundColor: '#f0f8ff', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' },
